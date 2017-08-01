@@ -504,6 +504,7 @@ def get_quadrilateral(line_dict,edge_indices, img):
     "Given four lines, this function returns the quadrilateral spanned by the lines together with key characteristics of the quadrilateral"
     # line_dict: Python dictionary containing the line segments
     # edge_indices: 4x1 list of line indices (integers) in the line dictionary
+    # img: numpy matrix (representing the scaled gray-scale image)
 
     # Calculate the 4 vertices
     topleft = line_intersection(line_dict,edge_indices[3],edge_indices[0])
@@ -528,7 +529,7 @@ def get_quadrilateral(line_dict,edge_indices, img):
     vertices = [topleft, topright, bottomright, bottomleft]
     area = [area, utility_area(area)]
     perimeter = [perimeter, utility_perimeter(perimeter,length)]
-    aspect_ratio = [aspect_ratio, utility_aspect_ration(aspect_ratio)]
+    aspect_ratio = [aspect_ratio, utility_aspect_ratio(aspect_ratio)]
     edge_fit = [utility_topleft, utility_topright, utility_bottomright, utility_bottomleft, (utility_topleft + utility_topright + utility_bottomright + utility_bottomleft) / 4]
     color = [color_top, color_right, color_bottom, color_left, utility_color(color_top, color_right, color_bottom, color_left)]
     total_utility = utility_total([area[1],perimeter[1],aspect_ratio[1],edge_fit[4],color[4]], utility_weights)
@@ -576,7 +577,7 @@ def sum_of_edge_lengths(line_dict,edge_indices):
     return length
 
 def get_color(line_dict, edge_index, location, img):
-    "Checks if the average color intensity of the pixels around a line segment has already been calculated and returns the color intensity"
+    "Checks if the average color intensity of the pixels around a line segment has already been calculated and returns the color intensity. If the color intensity has not yet been calculated, it calculates the color intensity and stores the value in the line dictionary"
     # line_dict: Python dictionary containing the line segments
     # edge_index: integer (index of line segment in the line dictionary)
     if "avg_color" in line_dict[edge_index]:
@@ -597,7 +598,8 @@ def get_color(line_dict, edge_index, location, img):
 ################################################################################################################################################################################
 
 def utility_color(color_top, color_right, color_bottom, color_left):
-    ""
+    "Returns a utility measuring how close the color intensities of the four edges are to each others. Rational: It is expected that the edges of a scanned document have similar color intensities."
+    # color_*: integer in [0,255] representing the average color intensity of that line segment
     if color_top and color_right and color_bottom and color_left:
         delta = max(color_top, color_right, color_bottom, color_left) - min(color_top, color_right, color_bottom, color_left)
         return 1 - delta/255
@@ -606,6 +608,8 @@ def utility_color(color_top, color_right, color_bottom, color_left):
 
 
 def utility_area(area):
+    "Returns a utility measuring how well the area of the quadrilateral fits the expected area. Rational: It is expected that the area of a scann document lies within a sensible range (i.e. not to small and not to large"
+    # area: integer
     max_area = region["max_paper"][0]*region["max_paper"][1]
     min_area = max_area * min_size_ratio**2
     if area > max_area:
@@ -616,14 +620,22 @@ def utility_area(area):
 
 
 def utility_perimeter(perimeter, edge_lengths):
+    "Returns a utility measuring how close the sum of the lengths of the line segments is to the perimeter of the quadrilateral.Rational: Theoretically, the sum of the length of the line segments should equal the perimeter"
+    # perimeter: integer (perimeter of the quadrilateral formed by the line segments)
+    # edge_lengths: integer (sum of the lengths of the line segments forming the quadrilateral)
     return 1 - abs(perimeter - edge_lengths) / perimeter
 
 
-def utility_aspect_ration(aspect_ratio):
+def utility_aspect_ratio(aspect_ratio):
+    "Returns a utility measuring how well the aspect ratio of the quadrilateral fits the actual aspect ratio of an A4 paper"
+    # aspect_ratio: float (aspect ratio of the quadrilateral)
     return 1 - abs(aspect_ratio - paper_aspect_ratio) / paper_aspect_ratio
 
 
 def utility_total(utilities, weights):
+    "Returns the total utility as a weighted sum of the individual utilities"
+    # utilities: list (containing the individual utilities)
+    # weights: list (containing the weight each utility should contribute to the total utility)
     utility = 0
     for i in range(0,len(utilities)):
         utility += utilities[i] * weights[i]
@@ -631,6 +643,13 @@ def utility_total(utilities, weights):
 
 
 def edge_fit_topleft(line_dict, edge_indices, side_lengths, topleft_vertex, edge_fit_radius, edge_fit_margin):
+    "Returns a utility measuring how well two line segments (top and left line segment) form a vertex (top-left vertex). Rational: The intersection of the line segments should be close to their endpoints"
+    # line_dict: Python dictionary containing the line segments
+    # edge_indices: 4x1 list of line indices (integers) in the line dictionary
+    # side_lenghts: 4x1 list containing the 4 side lengths of the quadrilateral
+    # topleft_vertex: 2x1 numpy array with the coordinates of the top-left vertex
+    # edge_fit_radius: integer (the intersection should lie within a certain radius of the respective endpoints of the line segments)
+    # edge_fit_margin: integer
     utility = 0
     top = line_dict[edge_indices[0]]["line_seg"][0:2]
     left = line_dict[edge_indices[3]]["line_seg"][0:4]
@@ -666,6 +685,7 @@ def edge_fit_topleft(line_dict, edge_indices, side_lengths, topleft_vertex, edge
 
 
 def edge_fit_topright(line_dict, edge_indices, side_lengths, topright_vertex, edge_fit_radius, edge_fit_margin):
+    "Analogous to above but for the top-right vertex"
     utility = 0
     top = line_dict[edge_indices[0]]["line_seg"][2:4]
     right = line_dict[edge_indices[1]]["line_seg"][0:4]
@@ -701,6 +721,7 @@ def edge_fit_topright(line_dict, edge_indices, side_lengths, topright_vertex, ed
 
 
 def edge_fit_bottomright(line_dict, edge_indices, side_lengths, bottomright_vertex, edge_fit_radius, edge_fit_margin):
+    "Analogous to above but for the bottom-right vertex"
     utility = 0
     bottom = line_dict[edge_indices[2]]["line_seg"][2:4]
     right = line_dict[edge_indices[1]]["line_seg"][0:4]
@@ -736,6 +757,7 @@ def edge_fit_bottomright(line_dict, edge_indices, side_lengths, bottomright_vert
 
 
 def edge_fit_bottomleft(line_dict, edge_indices, side_lengths, bottomleft_vertex, edge_fit_radius, edge_fit_margin):
+    "Analogous to above but for the bottom-left vertex"
     utility = 0
     bottom = line_dict[edge_indices[2]]["line_seg"][0:2]
     left = line_dict[edge_indices[3]]["line_seg"][0:4]
@@ -772,7 +794,17 @@ def edge_fit_bottomleft(line_dict, edge_indices, side_lengths, bottomleft_vertex
 
 
 
+################################################################################################################################################################################
+# Section: Dictionary of quadrilaterals
+# Purpose: Using the best edge candidates, all possible combinations resulting in a quadrilateral are computed and stored in a dictionary together with the utility values associated with each quadrilateral.
+# In a further step, the dictionary is also stored as a list which can be sorted according to the utility values to identify the quadrilateral that maximises the utility function
+################################################################################################################################################################################
+
 def build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_bottom, sorted_list_left, line_dict, img):
+    "Using the best edge candidates, all possible combinations resulting in a quadrilateral are computed and stored in a dictionary together with the utility values associated with each quadrilateral"
+    # sorted_list_* : sorted list of top (resp. right, left, bottom) line segments
+    # line_dict: Python dictionary containing the line segments
+    # img: numpy matrix (representing the scaled gray-scale image)
     quad_dict = {}
     j = 0
     for t in range(0, min(3,len(sorted_list_top))):
@@ -793,65 +825,78 @@ def build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_botto
     return quad_dict
 
 
-
-
-
 def quad_dict_to_list(quad_dict):
+    "Based on the dictionary storing the quadrilaterals, a list storing these quadrilaterals is created. This is necessary as we want to be able to sort the quadrilaterals according to their utility"
+    # quad_dict: Python dictionary of quadrilaterals
     quad_list = []
     for e in quad_dict:
         quad_list.append([e, quad_dict[e]["vertices"], quad_dict[e]["total_utility"], quad_dict[e]["edge_indices"]])
     return quad_list
 
+
 def sort_quad_list(quad_list):
+    "Sort the list of quadrilaterals according to their total utility in descending order"
+    # quad_list: list of lists containing the quadrilaterals information
     return sorted(quad_list, key = sort_by_third, reverse=True)
 
 
+
+################################################################################################################################################################################
+# Section: Combine all steps
+# Purpose: All previous steps are combined to identify the quadrilateral representing the scanned document
+################################################################################################################################################################################
+
+
 def original_vertices(vertices, resize_factor):
+    "The vertices of the quadrilateral are identified in a re-scaled image for performance reasons. Given the coordinates of the vertices in the re-scaled image, \
+    this function returns the coordinates in the original image"
+    # vertices: list whose elements are 2x1 numpy arrays (coordinates of the vertices)
+    # resize_factor: float
     return [resize_factor*item for item in vertices]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def document_vertices(img_original):
+    "Combines all previous steps and returns the vertices of the quadrilateral representing the scanned document"
+    # img_original: numpy matrix (representing the original gray-scale image)
 
+    # Size of the original image
     size_original = img_original.shape[:2]
 
+    # Re-size the original image for better performance. All analysis will be performed on the re-sized image
     img = resize_image(img_original, target_size)
-    img_size = img.shape[:2]
-    resize_factor = size_original[0] / img_size[0]
-    region = main_region(img_size, region_parameters)
+    img_size = img.shape[:2]                            # Size of the re-sized image
+    resize_factor = size_original[0] / img_size[0]      # Resize factor
+    region = main_region(img_size, region_parameters)   # Region in the image which likely contains the edges of the scanned document
 
+    # Identify the line segments in the image using the LSD algorithm
     lines = line_segment_detector(img)
+
+    # Store the line segments in a dictionary together with key characteristics (incl. individual utilities) of each line segment
     line_dict = build_line_dictionary(lines, img_size)
 
-    adj_matrix = adjacency_matrix(line_dict, radius, rho)
-    connected_components(adj_matrix, line_dict, img_size)
+    # Connects disjunct line segments which are part of a long line segment and stores the resulting longer line segment in the line dictionary
+    adj_matrix = adjacency_matrix(line_dict, radius, rho)   # Calculate adjacency matrix. Elements of the matrix indicate whether a pair of lines is connected
+    connected_components(adj_matrix, line_dict, img_size)   # Identify connected components via the adjacency matrix and store the resulting line segments in the line dictionary
 
+    # Create a sortable list from the line dictionary
     line_list = line_dict_to_list(line_dict)
-    sorted_list_top = sort_and_filter_list(line_list, "top")
-    sorted_list_left = sort_and_filter_list(line_list, "left")
-    sorted_list_right = sort_and_filter_list(line_list, "right")
-    sorted_list_bottom = sort_and_filter_list(line_list, "bottom")
+    sorted_list_top = sort_and_filter_list(line_list, "top")        # Sort the lines laying in the top area of the image (i.e. candidates for top edge of scanned doc) according to their utility to identify the best candidates
+    sorted_list_left = sort_and_filter_list(line_list, "left")      # Sort the lines laying in the left area of the image (i.e. candidates for left edge of scanned doc) according to their utility to identify the best candidates
+    sorted_list_right = sort_and_filter_list(line_list, "right")    # Sort the lines laying in the right area of the image (i.e. candidates for right edge of scanned doc) according to their utility to identify the best candidates
+    sorted_list_bottom = sort_and_filter_list(line_list, "bottom")  # Sort the lines laying in the bottom area of the image (i.e. candidates for bottom edge of scanned doc) according to their utility to identify the best candidates
 
+    # Using the best edge candidates, all possible combinations resulting in a quadrilateral are computed and stored in a dictionary together with the utility values associated with each quadrilateral
     quad_dict = build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_bottom, sorted_list_left, line_dict, img)
-    quad_list = quad_dict_to_list(quad_dict)
-    quad_list = sort_quad_list(quad_list)
+    quad_list = quad_dict_to_list(quad_dict)    # Create a sortable list from the dictionary of quadrilaterals
+    quad_list = sort_quad_list(quad_list)       # Sort the list according to the total utility of each quadrilateral in descending order. The frist quadrilateral in the resulting list is the best candidate to describe the edges of the scanned image
 
-    if quad_list[0][2] > 0.7:
-        vertices = original_vertices(quad_list[0][1],resize_factor)
+    # If the utility of best candidate exceeds a certain value, we are confident that we were able to identify the edges of the scanned document and we return the coordinates of the vertices
+    if quad_list[0][2] > 0.7:                                                       # Total utility that the best candidate must reach at minimum
+        vertices = original_vertices(quad_list[0][1],resize_factor)                 # Calculate original coordinates of the vertices
         print("The vertices of the document in the image are: ",vertices)
         return vertices
     else:
+        # Return default vertices if we are not confident enough that the best candidate represents the actual scanned document
         vertices = [np.array([region["x_bounds"][0] * resize_factor, region["y_bounds"][0] * resize_factor]),
                     np.array([region["x_bounds"][3] * resize_factor, region["y_bounds"][0] * resize_factor]),
                     np.array([region["x_bounds"][3] * resize_factor, region["y_bounds"][3] * resize_factor]),
@@ -861,6 +906,9 @@ def document_vertices(img_original):
 
 
 def warp_image(vertices, img_original):
+    "Perform a perspective transformation mapping the coordinates of the vertices on the coordinates of the vertices of an A4 paper and crop the image to only show the scanned document"
+    # vertices: list whose elements are 2x1 numpy arrays (coordinates of the vertices)
+    # img_original: numpy matrix (representing the original gray-scale image
     height = int(max(abs(vertices[3][1] - vertices[0][1]), abs(vertices[2][1] - vertices[1][1])))
     width = int(height / paper_aspect_ratio)
     pts1 = np.float32([vertices[0], vertices[1], vertices[2], vertices[3]])
@@ -878,12 +926,9 @@ def warp_image(vertices, img_original):
 
 ################################################################################################################################################################################
 ################################################################################################################################################################################
-#                                                                   Run!
+#  Parameters Definition
 ################################################################################################################################################################################
 ################################################################################################################################################################################
-
-
-# Parameters Definitions
 
 _refine = 1
 _scale =0.6
@@ -916,16 +961,24 @@ utility_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
 
 
 
-# Load an color image in grayscale
-img_original = cv2.imread('scan (23).jpg',0)
+################################################################################################################################################################################
+################################################################################################################################################################################
+#  RUN
+################################################################################################################################################################################
+################################################################################################################################################################################
+
+
+# Load a color image in grayscale
+img_original = cv2.imread('scan (1).jpg',0)
 img = resize_image(img_original,target_size)
 img_size = img.shape[:2]
 region = main_region(img_size,region_parameters)
 
-
 vertices = document_vertices(img_original)
 
 img_warped = warp_image(vertices,img_original)
+
+
 
 img_warped = cv2.medianBlur(img_warped,5)
 img_warped = cv2.adaptiveThreshold(img_warped,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,55,7)
