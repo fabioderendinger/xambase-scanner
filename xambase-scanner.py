@@ -199,9 +199,9 @@ def utility_length(length, location):
     # length: integer
     # location: {top, right, bottom, left}
     if location == "top" or location == "bottom":
-        return length / region["max_paper"][1]
+        return length / region["paper_size"][1]
     else:
-        return length / region["max_paper"][0]
+        return length / region["paper_size"][0]
 
 
 def main_region(img_size, parameters):
@@ -209,32 +209,21 @@ def main_region(img_size, parameters):
     # parameters: 3x1 list where parameters[0]: paper_ratio; parameters[1]: min_size_ratio; parameters[2]: boarder_margin
     # img_size: 2x1 tuple
 
-    if img_size[0]/img_size[1] >= parameters[0]:
-        max_paper_height = img_size[1] * parameters[0]
-        y_max = (img_size[0] - max_paper_height) / 2
-        y_min = (img_size[0] - max_paper_height * parameters[1]) / 2
-        y_max_con = min(parameters[2] * y_max, y_max * math.sqrt(y_max / max_paper_height))
-        y_min_con = min(img_size[0] / 2, y_min + (y_max - y_max_con))
-        x_min = img_size[1] * (1 - parameters[1]) / 2
-        region = {"x_bounds": [0, x_min, img_size[1] - x_min, img_size[1]],
-                "y_bounds": [y_max_con, y_min_con, img_size[0] - y_min_con, img_size[0] - y_max_con],
-                "mid": [img_size[0] / 2, img_size[1] / 2],
-                "dist": [img_size[0] / 2 - y_min_con, img_size[1] / 2 - x_min],
-                "max_paper": [max_paper_height,img_size[1]]}
-        return region
-    else:
-        max_paper_width = img_size[0] / parameters[0]
-        x_max = (img_size[1] - max_paper_width) / 2
-        x_min = (img_size[1] - max_paper_width * parameters[1]) / 2
-        x_max_con = min(parameters[2] * x_max, x_max * math.sqrt(x_max / max_paper_width))
-        x_min_con = min(img_size[1] / 2, x_min + (x_max - x_max_con))
-        y_min = img_size[0] * (1 - parameters[1]) / 2
-        region = {"x_bounds": [x_max_con, x_min_con, img_size[1] - x_min_con, img_size[1] - x_max_con],
-                "y_bounds": [0, y_min, img_size[1] - y_min, img_size[1]],
-                "mid": [img_size[0] / 2, img_size[1] / 2],
-                "dist": [img_size[0] / 2 - y_min, img_size[1] / 2 - x_min_con],
-                "max_paper": [img_size[0],max_paper_width]}
-        return region
+    paper_height = img_size[0] * parameters[1]
+    paper_width = paper_height / parameters[0]
+    max_paper_width = img_size[0] / parameters[0]
+
+    x = (img_size[1] - paper_width) / 2
+    x_with_neg_margin = max(0, x - paper_width * parameters[2])
+    x_with_pos_margin = max(0, x + paper_width * parameters[2])
+    y = img_size[0] * (1 - parameters[1]) / 2
+    y_with_margin = y + paper_height * parameters[2]
+    region = {"x_bounds": [x_with_neg_margin, x_with_pos_margin, img_size[1] - x_with_pos_margin, img_size[1] - x_with_neg_margin],
+            "y_bounds": [0, y_with_margin, img_size[1] - y_with_margin, img_size[1]],
+            "mid": [img_size[0] / 2, img_size[1] / 2],
+            "dist": [img_size[0] / 2 - y_min, img_size[1] / 2 - x_min_con],
+            "paper_size": [paper_height,paper_width]}
+    return region
 
 
 
@@ -615,13 +604,9 @@ def utility_color(color_top, color_right, color_bottom, color_left):
 def utility_area(area):
     "Returns a utility measuring how well the area of the quadrilateral fits the expected area. Rational: It is expected that the area of a scann document lies within a sensible range (i.e. not to small and not to large"
     # area: integer
-    max_area = region["max_paper"][0]*region["max_paper"][1]
-    min_area = max_area * min_size_ratio**2
-    if area > max_area:
-        return 1 - (area-max_area)/max_area
-    elif area < min_area:
-        return 1 - (min_area-area)/min_area
-    return 1
+    paper_area = region["paper_size"][0]*region["paper_size"][1]
+    return 1 - abs(area-paper_area) / paper_area
+
 
 
 def utility_perimeter(perimeter, edge_lengths):
@@ -938,8 +923,8 @@ _n_bins = 1024
 
 # Parameters for paper of scanned document
 paper_aspect_ratio = np.sqrt(2)     # Aspect ratio of A4 paper format (note: for US paper this needs to be changed)
-min_size_ratio = 3/5                # Ratio of min size vs max size of the scanned document in the image (max size: at least two opposite sides of the doc are at the edge of the image)
-margin = 0.6
+size_ratio = 9 / 10                 # Ratio paper_height / img_height
+margin = 0.15
 
 # Relevant parameters determining the main region where the scanned document is likely to be expected
 region_parameters = [paper_aspect_ratio, min_size_ratio, margin]
@@ -971,7 +956,7 @@ utility_weights = [0.175, 0.175, 0.3, 0.175, 0.175]
 
 
 # Load a color image in grayscale
-img_original = cv2.imread('scan (10).jpg',0)
+img_original = cv2.imread('scan (2).jpg',0)
 # Size of the original image
 size_original = img_original.shape[:2]
 
