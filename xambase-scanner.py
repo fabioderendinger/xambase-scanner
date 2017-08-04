@@ -209,19 +209,34 @@ def main_region(img_size, parameters):
     # parameters: 3x1 list where parameters[0]: paper_ratio; parameters[1]: min_size_ratio; parameters[2]: boarder_margin
     # img_size: 2x1 tuple
 
-    # if img_size[0]/img_size[1] > parameters[0]:
-    max_paper_height = img_size[1] * parameters[0]
-    y_max = (img_size[0] - max_paper_height) / 2
-    y_min = (img_size[0] - max_paper_height * parameters[1]) / 2
-    y_max_con = min(parameters[2] * y_max, y_max * math.sqrt(y_max / max_paper_height))
-    y_min_con = min(img_size[0] / 2, y_min + (y_max - y_max_con))
-    x_max = img_size[1] * (1 - parameters[1]) / 2
-    region = {"x_bounds": [0, x_max, img_size[1] - x_max, img_size[1]],
-            "y_bounds": [y_max_con, y_min_con, img_size[0] - y_min_con, img_size[0] - y_max_con],
-            "mid": [img_size[0] / 2, img_size[1] / 2],
-            "dist": [img_size[0] / 2 - y_min_con, img_size[1] / 2 - x_max],
-            "max_paper": [max_paper_height,img_size[1]]}
-    return region
+    if img_size[0]/img_size[1] >= parameters[0]:
+        max_paper_height = img_size[1] * parameters[0]
+        y_max = (img_size[0] - max_paper_height) / 2
+        y_min = (img_size[0] - max_paper_height * parameters[1]) / 2
+        y_max_con = min(parameters[2] * y_max, y_max * math.sqrt(y_max / max_paper_height))
+        y_min_con = min(img_size[0] / 2, y_min + (y_max - y_max_con))
+        x_min = img_size[1] * (1 - parameters[1]) / 2
+        region = {"x_bounds": [0, x_min, img_size[1] - x_min, img_size[1]],
+                "y_bounds": [y_max_con, y_min_con, img_size[0] - y_min_con, img_size[0] - y_max_con],
+                "mid": [img_size[0] / 2, img_size[1] / 2],
+                "dist": [img_size[0] / 2 - y_min_con, img_size[1] / 2 - x_min],
+                "max_paper": [max_paper_height,img_size[1]]}
+        return region
+    else:
+        max_paper_width = img_size[0] / parameters[0]
+        x_max = (img_size[1] - max_paper_width) / 2
+        x_min = (img_size[1] - max_paper_width * parameters[1]) / 2
+        x_max_con = min(parameters[2] * x_max, x_max * math.sqrt(x_max / max_paper_width))
+        x_min_con = min(img_size[1] / 2, x_min + (x_max - x_max_con))
+        y_min = img_size[0] * (1 - parameters[1]) / 2
+        region = {"x_bounds": [x_max_con, x_min_con, img_size[1] - x_min_con, img_size[1] - x_max_con],
+                "y_bounds": [0, y_min, img_size[1] - y_min, img_size[1]],
+                "mid": [img_size[0] / 2, img_size[1] / 2],
+                "dist": [img_size[0] / 2 - y_min, img_size[1] / 2 - x_min_con],
+                "max_paper": [img_size[0],max_paper_width]}
+        return region
+
+
 
 
 def utility_top(mid_point, img_size, region):
@@ -232,10 +247,8 @@ def utility_top(mid_point, img_size, region):
     if mid_point[1] >= region["y_bounds"][0] and mid_point[1] <= region["y_bounds"][1]:
         return 1
     elif mid_point[1] < region["y_bounds"][0]:
-        print("top1 ", (mid_point[1] / region["y_bounds"][0]) ** 2)
         return (mid_point[1] / region["y_bounds"][0]) ** 2
     else:
-        print("top2 ", ((region["mid"][0] - mid_point[1]) / region["dist"][0]) ** 2)
         return ((region["mid"][0] - mid_point[1]) / region["dist"][0]) ** 2
 
 
@@ -247,10 +260,8 @@ def utility_bottom(mid_point, img_size, region):
     if mid_point[1] >= region["y_bounds"][2] and mid_point[1] <= region["y_bounds"][3]:
         return 1
     elif mid_point[1] > region["y_bounds"][3]:
-        print("bottom1 ", ((img_size[0] - mid_point[1]) / region["y_bounds"][0]) ** 2)
         return ((img_size[0] - mid_point[1]) / region["y_bounds"][0]) ** 2
     else:
-        print("bottom2 ", ((mid_point[1] - region["mid"][0]) / region["dist"][0]) ** 2)
         return ((mid_point[1] - region["mid"][0]) / region["dist"][0]) ** 2
 
 
@@ -262,10 +273,8 @@ def utility_left(mid_point, img_size, region):
     if mid_point[0] >= region["x_bounds"][0] and mid_point[0] <= region["x_bounds"][1]:
         return 1
     elif mid_point[0] > region["x_bounds"][1]:
-        print("left1 ", ((region["mid"][1] - mid_point[0]) / region["dist"][1]) ** 2)
         return ((region["mid"][1] - mid_point[0]) / region["dist"][1]) ** 2
     else:
-        print("left2 ", (mid_point[0] / region["x_bounds"][0]) ** 2)
         return (mid_point[0] / region["x_bounds"][0]) ** 2
 
 
@@ -277,10 +286,8 @@ def utility_right(mid_point, img_size, region):
     if mid_point[0] >= region["x_bounds"][2] and mid_point[0] <= region["x_bounds"][3]:
         return 1
     elif mid_point[0] < region["x_bounds"][2]:
-        print("right1 ", ((mid_point[0] - region["mid"][1]) / region["dist"][1]) ** 2)
         return ((mid_point[0] - region["mid"][1]) / region["dist"][1]) ** 2
     else:
-        print("right2 ", ((img_size[1] - mid_point[0]) / region["x_bounds"][0]) ** 2)
         return ((img_size[1] - mid_point[0]) / region["x_bounds"][0]) ** 2
 
 
@@ -341,14 +348,11 @@ def adjacency_matrix(lines, radius, rho):
     adjMatrix = np.zeros([n, n])
 
     for i in range(1, n):
-        start = timeit.default_timer()
         for j in range(i, n):
             value = are_connected(lines[i - 1]["line_seg"], lines[i - 1]["angle"], lines[j]["line_seg"],
                                   lines[j]["angle"], radius, rho)
             adjMatrix[i - 1, j] = value
             adjMatrix[j, i - 1] = value
-        end = timeit.default_timer()
-        print('cycle: ', i, ' | time', end - start)
     return adjMatrix
 
 
@@ -380,18 +384,19 @@ def connected_components(adjMatrix, line_dict, img_size):
                 line = line_from_connected_lines(line_dict, new_component)
                 vector, length, alpha = length_and_angle(line)
                 location = find_location(line, alpha, img_size)
-                ulen = utility_length(length, location[1])
-                total_utility = total_utility_line(ulen,location[2])
-                line_dict[j] = {"component": new_component,
-                                "line_seg": line,
-                                "angle": alpha,
-                                "length": [length, ulen],
-                                "location": location,
-                                "utility": total_utility,
-                                "type": 1,
-                                "status": 1}
-                inactivate_lines(line_dict, new_component)
-                j += 1
+                if location and location[2] > 0.5:
+                    ulen = utility_length(length, location[1])
+                    total_utility = total_utility_line(ulen,location[2])
+                    line_dict[j] = {"component": new_component,
+                                    "line_seg": line,
+                                    "angle": alpha,
+                                    "length": [length, ulen],
+                                    "location": location,
+                                    "utility": total_utility,
+                                    "type": 1,
+                                    "status": 1}
+                    inactivate_lines(line_dict, new_component)
+                    j += 1
 
 
 
@@ -855,28 +860,19 @@ def original_vertices(vertices, resize_factor):
     return [resize_factor*item for item in vertices]
 
 
-def document_vertices(img_original):
+def document_vertices(img_resized):
     "Combines all previous steps and returns the vertices of the quadrilateral representing the scanned document"
-    # img_original: numpy matrix (representing the original gray-scale image)
-
-    # Size of the original image
-    size_original = img_original.shape[:2]
-
-    # Re-size the original image for better performance. All analysis will be performed on the re-sized image
-    img = resize_image(img_original, target_size)
-    img_size = img.shape[:2]                            # Size of the re-sized image
-    resize_factor = size_original[0] / img_size[0]      # Resize factor
-    region = main_region(img_size, region_parameters)   # Region in the image which likely contains the edges of the scanned document
+    # img_resized: numpy matrix (representing the resized gray-scale image)
 
     # Identify the line segments in the image using the LSD algorithm
-    lines = line_segment_detector(img)
+    lines = line_segment_detector(img_resized)
 
     # Store the line segments in a dictionary together with key characteristics (incl. individual utilities) of each line segment
-    line_dict = build_line_dictionary(lines, img_size)
+    line_dict = build_line_dictionary(lines, size_img_resized)
 
     # Connects disjunct line segments which are part of a long line segment and stores the resulting longer line segment in the line dictionary
     adj_matrix = adjacency_matrix(line_dict, radius, rho)   # Calculate adjacency matrix. Elements of the matrix indicate whether a pair of lines is connected
-    connected_components(adj_matrix, line_dict, img_size)   # Identify connected components via the adjacency matrix and store the resulting line segments in the line dictionary
+    connected_components(adj_matrix, line_dict, size_img_resized)   # Identify connected components via the adjacency matrix and store the resulting line segments in the line dictionary
 
     # Create a sortable list from the line dictionary
     line_list = line_dict_to_list(line_dict)
@@ -886,7 +882,7 @@ def document_vertices(img_original):
     sorted_list_bottom = sort_and_filter_list(line_list, "bottom")  # Sort the lines laying in the bottom area of the image (i.e. candidates for bottom edge of scanned doc) according to their utility to identify the best candidates
 
     # Using the best edge candidates, all possible combinations resulting in a quadrilateral are computed and stored in a dictionary together with the utility values associated with each quadrilateral
-    quad_dict = build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_bottom, sorted_list_left, line_dict, img)
+    quad_dict = build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_bottom, sorted_list_left, line_dict, img_resized)
     quad_list = quad_dict_to_list(quad_dict)    # Create a sortable list from the dictionary of quadrilaterals
     quad_list = sort_quad_list(quad_list)       # Sort the list according to the total utility of each quadrilateral in descending order. The frist quadrilateral in the resulting list is the best candidate to describe the edges of the scanned image
 
@@ -930,6 +926,7 @@ def warp_image(vertices, img_original):
 ################################################################################################################################################################################
 ################################################################################################################################################################################
 
+# Parameters for LSD algorithm
 _refine = 1
 _scale =0.6
 _sigma_scale = 0.6
@@ -939,15 +936,20 @@ _log_eps = 0.0
 _density_th = 0.7
 _n_bins = 1024
 
-paper_aspect_ratio = np.sqrt(2)
-min_size_ratio = 3/5
+# Parameters for paper of scanned document
+paper_aspect_ratio = np.sqrt(2)     # Aspect ratio of A4 paper format (note: for US paper this needs to be changed)
+min_size_ratio = 3/5                # Ratio of min size vs max size of the scanned document in the image (max size: at least two opposite sides of the doc are at the edge of the image)
 margin = 0.6
 
+# Relevant parameters determining the main region where the scanned document is likely to be expected
 region_parameters = [paper_aspect_ratio, min_size_ratio, margin]
 
+# Pixel length of the longer side of the down-sampled image
 target_size = 380
-radius = 5
-rho = 5
+
+# Connected lines
+radius = 5  # maximum distance between the end-points of two lines so the lines are still considered as potentially connected
+rho = 5     # maximum angle delta in degrees between two lines so the lines are still considered as potentially connected
 
 # Color scan
 width = 2
@@ -957,7 +959,7 @@ edge_fit_radius = 8
 edge_fit_margin = 8
 
 # Utility Quadrilateral
-utility_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
+utility_weights = [0.175, 0.175, 0.3, 0.175, 0.175]
 
 
 
@@ -969,129 +971,38 @@ utility_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
 
 
 # Load a color image in grayscale
-img_original = cv2.imread('scan (1).jpg',0)
-img = resize_image(img_original,target_size)
-img_size = img.shape[:2]
-region = main_region(img_size,region_parameters)
+img_original = cv2.imread('scan (10).jpg',0)
+# Size of the original image
+size_original = img_original.shape[:2]
 
-vertices = document_vertices(img_original)
+start = timeit.default_timer()
 
+# Re-size the original image for better performance. All analysis will be performed on the re-sized imag
+img_resized = resize_image(img_original,target_size)
+size_img_resized = img_resized.shape[:2]                    # Size of the re-sized image
+resize_factor = size_original[0] / size_img_resized[0]      # Resize factor
+
+#  Identify main region where the scanned document is likely to be expected
+region = main_region(size_img_resized, region_parameters)
+
+# Calculate the vertices of the scanned document in the origianl image
+vertices = document_vertices(img_resized)
+
+# Apply perspective correction and crop the image
 img_warped = warp_image(vertices,img_original)
 
+end = timeit.default_timer()
+print("Runtime: ",end - start)
 
-
+# Color enhancement of scanned document
 img_warped = cv2.medianBlur(img_warped,5)
-img_warped = cv2.adaptiveThreshold(img_warped,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,55,7)
-print(img_warped)
+img_warped = cv2.adaptiveThreshold(img_warped,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,21,7)
+img_warped = cv2.pyrDown(img_warped)
 
+
+# Save document
 cv2.imwrite('warped.png',img_warped)
 cv2.imshow('image',img_warped)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
-
-
-
-"""
-img_original[int(vertices[0][1]):int(vertices[0][1]) + 25, int(vertices[0][0]):int(vertices[0][0]) + 25] = 255
-img_original[int(vertices[1][1]):int(vertices[1][1]) + 25, int(vertices[1][0]) - 25:int(vertices[1][0])] = 255
-img_original[int(vertices[2][1]) - 25:int(vertices[2][1]), int(vertices[2][0]) - 25:int(vertices[2][0])] = 255
-img_original[int(vertices[3][1]) - 25:int(vertices[3][1]), int(vertices[3][0]):int(vertices[3][0]) + 25] = 255
-cv2.imshow('image',img_original)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-
-
-
-size_original = img_original.shape[:2]
-
-#img = cv2.GaussianBlur(img,(49,49),0)
-
-img = resize_image(img_original,target_size)
-img_size = img.shape[:2]
-
-region = main_region(img_size,region_parameters)
-
-
-'''
-img = cv2.pyrDown(img_original)
-img = cv2.pyrDown(img)
-img = cv2.pyrDown(img)
-img = cv2.pyrDown(img)
-'''
-
-# height, width = img.shape[:2]
-
-
-cv2.imshow('image',img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-
-start = timeit.default_timer()
-lines = line_segment_detector(img)
-print("Initial number of lines: ",len(lines))
-
-
-
-line_dict  = build_line_dictionary(lines, img_size)
-print("Reduced number of lines: ", len(line_dict))
-end = timeit.default_timer()
-print(end - start)
-
-
-
-
-start = timeit.default_timer()
-adjMatrix = adjacency_matrix(line_dict, radius, rho)
-end = timeit.default_timer()
-print(end - start)
-#print(adjMatrix)
-
-
-connected_components(adjMatrix, line_dict, img_size)
-
-
-list = line_dict_to_list(line_dict)
-
-
-print("Sorted Top: ", sort_and_filter_list(list,"top"))
-print("Sorted Right: ", sort_and_filter_list(list,"right"))
-print("Sorted Bottom: ", sort_and_filter_list(list,"bottom"))
-print("Sorted Left: ", sort_and_filter_list(list,"left"))
-sorted_list_top = sort_and_filter_list(list,"top")
-sorted_list_left = sort_and_filter_list(list,"left")
-sorted_list_right = sort_and_filter_list(list,"right")
-sorted_list_bottom = sort_and_filter_list(list,"bottom")
-
-quad_dict = build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_bottom, sorted_list_left, line_dict, img)
-quad_list = quad_dict_to_list(quad_dict)
-quad_list = sort_quad_list(quad_list)
-print(quad_list)
-
-def lines_from_edge_indices(edge_indices):
-    return np.array([[line_dict[edge_indices[0]]["line_seg"]], [line_dict[edge_indices[1]]["line_seg"]], [line_dict[edge_indices[2]]["line_seg"]], [line_dict[edge_indices[3]]["line_seg"]]])
-
-for e in quad_list:
-    img2 = np.copy(img)
-    img2[int(e[1][0][1]):int(e[1][0][1]) + 5, int(e[1][0][0]):int(e[1][0][0]) + 5] = 255
-    img2[int(e[1][1][1]):int(e[1][1][1]) + 5, int(e[1][1][0]) - 5:int(e[1][1][0])] = 255
-    img2[int(e[1][2][1]) - 5:int(e[1][2][1]), int(e[1][2][0]) - 5:int(e[1][2][0])] = 255
-    img2[int(e[1][3][1]) - 5:int(e[1][3][1]), int(e[1][3][0]):int(e[1][3][0]) + 5] = 255
-    edges = lines_from_edge_indices(e[3])
-    img2 = cv2.createLineSegmentDetector().drawSegments(img2, edges)
-    print("Total Utility: ", e[2])
-    print("Utility Area: ", quad_dict[e[0]]["area"])
-    print("Utility Perimeter: ", quad_dict[e[0]]["perimeter"])
-    print("Utility Aspect Ratio: ", quad_dict[e[0]]["aspect_ratio"])
-    print("Utility Edge Fit: ", quad_dict[e[0]]["edge_fit"])
-    print("Utility Color: ", quad_dict[e[0]]["color"])
-
-    cv2.imshow('img2', img2)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    del img2
-
-
-"""
