@@ -1,3 +1,11 @@
+# README
+# The input image is specified in line 977 ( img_original = cv2.imread('scan (1).jpg',0) )
+#
+# 1. If you want the test another input image, place the input image in the same folder as this python file
+# 2. Replace 'scan (1).jpg' with the name of the image you want to test
+# 3. Run the code
+
+
 import numpy as np
 from numpy import linalg as LA
 import cv2
@@ -199,9 +207,9 @@ def utility_length(length, location):
     # length: integer
     # location: {top, right, bottom, left}
     if location == "top" or location == "bottom":
-        return length / region["max_paper"][1]
+        return length / region["paper_size"][1]
     else:
-        return length / region["max_paper"][0]
+        return length / region["paper_size"][0]
 
 
 def main_region(img_size, parameters):
@@ -209,32 +217,22 @@ def main_region(img_size, parameters):
     # parameters: 3x1 list where parameters[0]: paper_ratio; parameters[1]: min_size_ratio; parameters[2]: boarder_margin
     # img_size: 2x1 tuple
 
-    if img_size[0]/img_size[1] >= parameters[0]:
-        max_paper_height = img_size[1] * parameters[0]
-        y_max = (img_size[0] - max_paper_height) / 2
-        y_min = (img_size[0] - max_paper_height * parameters[1]) / 2
-        y_max_con = min(parameters[2] * y_max, y_max * math.sqrt(y_max / max_paper_height))
-        y_min_con = min(img_size[0] / 2, y_min + (y_max - y_max_con))
-        x_min = img_size[1] * (1 - parameters[1]) / 2
-        region = {"x_bounds": [0, x_min, img_size[1] - x_min, img_size[1]],
-                "y_bounds": [y_max_con, y_min_con, img_size[0] - y_min_con, img_size[0] - y_max_con],
-                "mid": [img_size[0] / 2, img_size[1] / 2],
-                "dist": [img_size[0] / 2 - y_min_con, img_size[1] / 2 - x_min],
-                "max_paper": [max_paper_height,img_size[1]]}
-        return region
-    else:
-        max_paper_width = img_size[0] / parameters[0]
-        x_max = (img_size[1] - max_paper_width) / 2
-        x_min = (img_size[1] - max_paper_width * parameters[1]) / 2
-        x_max_con = min(parameters[2] * x_max, x_max * math.sqrt(x_max / max_paper_width))
-        x_min_con = min(img_size[1] / 2, x_min + (x_max - x_max_con))
-        y_min = img_size[0] * (1 - parameters[1]) / 2
-        region = {"x_bounds": [x_max_con, x_min_con, img_size[1] - x_min_con, img_size[1] - x_max_con],
-                "y_bounds": [0, y_min, img_size[1] - y_min, img_size[1]],
-                "mid": [img_size[0] / 2, img_size[1] / 2],
-                "dist": [img_size[0] / 2 - y_min, img_size[1] / 2 - x_min_con],
-                "max_paper": [img_size[0],max_paper_width]}
-        return region
+    paper_height = img_size[0] * parameters[1]
+    paper_width = paper_height / parameters[0]
+    max_paper_width = img_size[0] / parameters[0]
+
+    x = (img_size[1] - paper_width) / 2
+    x_with_neg_margin = max(0, x - paper_width * parameters[2])
+    x_with_pos_margin = x + paper_width * parameters[2]
+    y = img_size[0] * (1 - parameters[1]) / 2
+    y_with_neg_margin = max(0, x - paper_height * parameters[2])
+    y_with_pos_margin = y + paper_height * parameters[2]
+    region = {"x_bounds": [x_with_neg_margin, x_with_pos_margin, img_size[1] - x_with_pos_margin, img_size[1] - x_with_neg_margin],
+            "y_bounds": [y_with_neg_margin, y_with_pos_margin, img_size[0] - y_with_pos_margin, img_size[0]-y_with_neg_margin],
+            "mid": [img_size[0] / 2, img_size[1] / 2],
+            "dist": [img_size[0] / 2 - y_with_pos_margin, img_size[1] / 2 - x_with_pos_margin],
+            "paper_size": [paper_height,paper_width]}
+    return region
 
 
 
@@ -607,7 +605,7 @@ def utility_color(color_top, color_right, color_bottom, color_left):
     # color_*: integer in [0,255] representing the average color intensity of that line segment
     if color_top and color_right and color_bottom and color_left:
         delta = max(color_top, color_right, color_bottom, color_left) - min(color_top, color_right, color_bottom, color_left)
-        return 1 - delta/255
+        return 1 - (delta/255)**2
     else:
         return 0
 
@@ -615,13 +613,15 @@ def utility_color(color_top, color_right, color_bottom, color_left):
 def utility_area(area):
     "Returns a utility measuring how well the area of the quadrilateral fits the expected area. Rational: It is expected that the area of a scann document lies within a sensible range (i.e. not to small and not to large"
     # area: integer
-    max_area = region["max_paper"][0]*region["max_paper"][1]
-    min_area = max_area * min_size_ratio**2
-    if area > max_area:
-        return 1 - (area-max_area)/max_area
-    elif area < min_area:
-        return 1 - (min_area-area)/min_area
+    paper_area_max = size_img_resized[0] * size_img_resized[0] / paper_aspect_ratio
+    paper_area_min = region["paper_size"][0]*region["paper_size"][1] * (1-margin)**2
+    if area > paper_area_max:
+        return 1 - (area-paper_area_max)/paper_area_max
+    elif area < paper_area_min:
+        return 1 - (paper_area_min-area)/paper_area_min
     return 1
+
+
 
 
 def utility_perimeter(perimeter, edge_lengths):
@@ -885,9 +885,10 @@ def document_vertices(img_resized):
     quad_dict = build_quadrilater_dict(sorted_list_top, sorted_list_right, sorted_list_bottom, sorted_list_left, line_dict, img_resized)
     quad_list = quad_dict_to_list(quad_dict)    # Create a sortable list from the dictionary of quadrilaterals
     quad_list = sort_quad_list(quad_list)       # Sort the list according to the total utility of each quadrilateral in descending order. The frist quadrilateral in the resulting list is the best candidate to describe the edges of the scanned image
+    print(quad_list)
 
     # If the utility of best candidate exceeds a certain value, we are confident that we were able to identify the edges of the scanned document and we return the coordinates of the vertices
-    if quad_list[0][2] > 0.7:                                                       # Total utility that the best candidate must reach at minimum
+    if quad_list and quad_list[0][2] > 0.7:                                         # Total utility that the best candidate must reach at minimum
         vertices = original_vertices(quad_list[0][1],resize_factor)                 # Calculate original coordinates of the vertices
         print("The vertices of the document in the image are: ",vertices)
         return vertices
@@ -920,6 +921,7 @@ def warp_image(vertices, img_original):
 
 
 
+
 ################################################################################################################################################################################
 ################################################################################################################################################################################
 #  Parameters Definition
@@ -938,14 +940,14 @@ _n_bins = 1024
 
 # Parameters for paper of scanned document
 paper_aspect_ratio = np.sqrt(2)     # Aspect ratio of A4 paper format (note: for US paper this needs to be changed)
-min_size_ratio = 3/5                # Ratio of min size vs max size of the scanned document in the image (max size: at least two opposite sides of the doc are at the edge of the image)
-margin = 0.6
+size_ratio = 9 / 10                 # Ratio paper_height / img_height
+margin = 0.15
 
 # Relevant parameters determining the main region where the scanned document is likely to be expected
-region_parameters = [paper_aspect_ratio, min_size_ratio, margin]
+region_parameters = [paper_aspect_ratio, size_ratio, margin]
 
 # Pixel length of the longer side of the down-sampled image
-target_size = 380
+target_size = 360
 
 # Connected lines
 radius = 5  # maximum distance between the end-points of two lines so the lines are still considered as potentially connected
@@ -971,7 +973,8 @@ utility_weights = [0.175, 0.175, 0.3, 0.175, 0.175]
 
 
 # Load a color image in grayscale
-img_original = cv2.imread('scan (10).jpg',0)
+# IMPORTANT: COMPARE SLIDES TO SEE THE CONDITIONS ON THE INPUT IMAGE
+img_original = cv2.imread('scan (1).jpg',0)
 # Size of the original image
 size_original = img_original.shape[:2]
 
@@ -994,10 +997,11 @@ img_warped = warp_image(vertices,img_original)
 end = timeit.default_timer()
 print("Runtime: ",end - start)
 
+
 # Color enhancement of scanned document
 img_warped = cv2.medianBlur(img_warped,5)
 img_warped = cv2.adaptiveThreshold(img_warped,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,21,7)
-img_warped = cv2.pyrDown(img_warped)
+img_warped = cv2.blur(img_warped,(3,3))
 
 
 # Save document
@@ -1005,4 +1009,3 @@ cv2.imwrite('warped.png',img_warped)
 cv2.imshow('image',img_warped)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
-
